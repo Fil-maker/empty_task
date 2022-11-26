@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Report</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .container{
+            display: flex;
+        }
+        .left, .right {
+            display: inline-block;
+            width: 48%;
+            margin-left: 1%;
+            margin-right: 1%;
+        }
+        .right{
+            justify-content: end;
+        }
+
+        th, td {
+            border: 1px solid;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+<h1 style="text-align: center">Аналитика по зарплатам и городам для профессии {{ name }}</h1>
+<main style="text-align: center">
+    <div style="display: flex; justify-content: center">
+        <img src="{{ plot }}">
+    </div>
+    <h2>Статистика по годам</h2>
+    <table>
+        <tr>
+            <th>Год</th>
+            <th>Средняя зарплата</th>
+            <th>Средняя зарплата - {{name}}</th>
+            <th>Количество вакансий</th>
+            <th>Количество вакансий - {{name}}</th>
+        </tr>
+        {% for key, val in years_stat.items() %}
+        <tr>
+            <td>{{ key }}</td>
+            {% for i in range(4) %}
+            <td>{{ val[i] }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+    <h2>Статистика по городам</h2>
+    <div class="container">
+        <div class="left">
+            <table class="half-table">
+                <tr>
+                    <th>Год</th>
+                    <th>Уровень зарплат</th>
+                </tr>
+                {% for key, val in cities_sum.items() %}
+                <tr>
+                    <td>{{ key }}</td>
+                    <td>{{ val }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <div class="right">
+            <table class="half-table">
+                <tr>
+                    <th>Город</th>
+                    <th>Доля вакансий</th>
+                </tr>
+                {% for key, val in cities_part.items() %}
+                <tr>
+                    <td>{{ key }}</td>
+                    <td>{{ val }}%</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>
