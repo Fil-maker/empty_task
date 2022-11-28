@@ -8,6 +8,12 @@ import numpy as np
 from jinja2 import Environment, FileSystemLoader
 import pdfkit
 import os
+import csv
+import math
+from datetime import datetime
+from prettytable import PrettyTable
+from typing import *
+
 
 # import time
 
@@ -249,14 +255,389 @@ class Report:
         config = pdfkit.configuration(wkhtmltopdf=r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe')
         pdfkit.from_string(pdf_template, "report.pdf", configuration=config, options={"enable-local-file-access": ""})
 
+# region const
+
+def prettify_val(val):
+    if type(val) == list:
+        val = "\n".join(val)
+    val = str(val)
+    if len(val) > 100:
+        val = val[:100] + "..."
+    return val
+
+
+def parse_money(amount):
+    nseq = []
+    seq = list(reversed(list(str(amount))))
+    for i in range(len(seq)):
+        nseq.append(seq[i])
+        if i % 3 == 2:
+            nseq.append(" ")
+    return "".join(reversed(nseq)).strip()
+
+
+def try_parse(val):
+    if val == math.nan:
+        return "nan"
+    if val == "True":
+        return "TRUE"
+    if val == "False":
+        return "FALSE"
+    try:
+        val = int(float(val))
+    finally:
+        return str(val)
+
+
+def skills_filter(vac, *args):
+    for skill in args[1].split(", "):
+        if skill not in vac["key_skills"]:
+            return False
+    return True
+
+
+def salary_filter(vac, *args):
+    return int(vac["salary_from"]) <= int(args[1]) <= int(vac["salary_to"])
+
+
+def publish_filter(vac, *args):
+    # return datetime.strptime(vac["published_at_date"], "%d.%m.%Y") == datetime.strptime(args[1], "%d.%m.%Y")
+    return datetime.strptime(".".join(vac["published_at"].split("T")[0].split("-")[::-1]), "%d.%m.%Y") == datetime.strptime(args[1], "%d.%m.%Y")
+
+
+def parameter_filter(vac, *args):
+    return DIC_PARAM[vac[dic_terms[args[0]]]] == args[1]
+
+
+def premium_filter(vac, *args):
+    return dic_joke[vac["premium"]] == args[1]
+
+
+def simple_parameter_filter(vac, *args):
+    return vac[dic_terms[args[0]]] == args[1]
+
+
+def get_filter(func, *args):
+    def parameter_func(vac):
+        return func(vac, *args)
+
+    return parameter_func
+
+
+DIC_FILTER = {"Навыки": skills_filter,
+              "Оклад": salary_filter,
+              "Дата публикации вакансии": publish_filter,
+              "Опыт работы": parameter_filter,
+              "Премиум-вакансия": premium_filter,
+              "Идентификатор валюты оклада": parameter_filter,
+              "Название": simple_parameter_filter,
+              "Название региона": simple_parameter_filter,
+              "Компания": simple_parameter_filter,
+              "": lambda *x: True
+              }
+DIC_PARAM = {
+    # exp
+    "noExperience": "Нет опыта",
+    "between1And3": "От 1 года до 3 лет",
+    "between3And6": "От 3 до 6 лет",
+    "moreThan6": "Более 6 лет",
+    # money
+    "AZN": "Манаты",
+    "BYR": "Белорусские рубли",
+    "EUR": "Евро",
+    "GEL": "Грузинский лари",
+    "KGS": "Киргизский сом",
+    "KZT": "Тенге",
+    "RUR": "Рубли",
+    "UAH": "Гривны",
+    "USD": "Доллары",
+    "UZS": "Узбекский сум",
+    # gross
+    "Да": "Без вычета налогов",
+    "Нет": "С вычетом налогов",
+    "TRUE": "Без вычета налогов",
+    "FALSE": "С вычетом налогов",
+}
+dic_joke = {
+    "FALSE": "Нет",
+    "False": "Нет",
+    "Нет": "Нет",
+    "TRUE": "Да",
+    "True": "Да",
+    "Да": "Да"
+}
+dic_trans = {"№": "№",
+             "name": "Название",
+             "description": "Описание",
+             "key_skills": "Навыки",
+             # "experience_id": "Опыт работы",
+             "experience": "Опыт работы",
+             "premium": "Премиум-вакансия",
+             "employer_name": "Компания",
+             # "salary_from": "Нижняя граница вилки оклада",
+             # "salary_to": "Верхняя граница вилки оклада",
+             # "salary_gross": "Оклад указан до вычета налогов",
+             # "salary_currency": "Идентификатор валюты оклада",
+             "salary": "Оклад",
+             "area_name": "Название региона",
+             # "published_at": "Дата и время публикации вакансии",
+             "published_at_date": "Дата публикации вакансии"}
+dic_terms = {
+    "Название": "name",
+    "Описание": "description",
+    "Навыки": "key_skills",
+    "Опыт работы": "experience_id",
+    "Премиум-вакансия": "premium",
+    "Компания": "employer_name",
+    "Нижняя граница вилки оклада": "salary_from",
+    "Верхняя граница вилки оклада": "salary_to",
+    "Оклад указан до вычета налогов": "salary_gross",
+    "Идентификатор валюты оклада": "salary_currency",
+    "Оклад": "salary",
+    "Название региона": "area_name",
+    "Дата и время публикации вакансии": "published_at",
+    "Дата публикации вакансии": "published_at_date"
+}
+currency_to_rub = {
+    "AZN": 35.68,
+    "BYR": 23.91,
+    "EUR": 59.90,
+    "GEL": 21.74,
+    "KGS": 0.76,
+    "KZT": 0.13,
+    "RUR": 1,
+    "UAH": 1.64,
+    "USD": 60.66,
+    "UZS": 0.0055,
+}
+exp_list = ["Нет опыта",
+            "От 1 года до 3 лет",
+            "От 3 до 6 лет",
+            "Более 6 лет"]
+dic_sorters = {
+    "": lambda v: True,
+    "Название": lambda v: v.name,
+    "Описание": lambda v: v.description,
+    "Компания": lambda v: v.employer_name,
+    "Название региона": lambda v: v.area_name,
+    "Опыт работы": lambda v: exp_list.index(DIC_PARAM[v.experience_id]),
+    "Премиум-вакансия": lambda v: dic_joke[v.premium],
+    "Оклад": lambda v: (int(v.salary.salary_from) + int(v.salary.salary_to)) / 2 * currency_to_rub[
+        v.salary.salary_currency],
+    "Навыки": lambda v: len(v.key_skills) if type(v.key_skills) == list else 1,
+    "Дата публикации вакансии": lambda v: [datetime.strptime(v.published_at, "%Y-%m-%dT%H:%M:%S%z")]
+}
+
+
+# endregion
+
+class DataSet:
+    def __init__(self, file_name: str) -> None:
+        self.file_name: str = file_name
+        self.vacancies_objects: List[Vacancy] = []
+        self.fill_vacancies()
+
+    def read_file(self):
+        keys = []
+        values = []
+        cnt = 1
+        with open(self.file_name, encoding="utf-8") as file:
+            reader = csv.reader(file)
+            for row in reader:
+                if not keys:
+                    keys = ["№"] + row
+                else:
+                    my_row = row.copy()
+                    if all(my_row):
+                        values.append([str(cnt)] + [try_parse(i) for i in row])
+                        cnt += 1
+        values = list(filter(lambda x: "nan" not in x, values))
+        if not len(keys):
+            print("Пустой файл")
+            exit(0)
+        if not len(values):
+            print("Нет данных")
+            exit(0)
+        return values, keys
+
+    def fill_vacancies(self):
+        reader, list_naming = self.read_file()
+        for vacancy in reader:
+            appendix = {}
+            for i in range(len(vacancy)):
+                append_item = vacancy[i].strip()
+                tag_start = append_item.find("<")
+                while tag_start != -1:
+                    tag_end = append_item.find(">", tag_start)
+                    append_item = append_item.replace(append_item[tag_start: tag_end + 1], "")
+                    tag_start = append_item.find("<", tag_start)
+                append_item = append_item.strip()
+                while append_item.find("  ") != -1:
+                    append_item = append_item.replace("  ", " ")
+                if append_item.find("\n") != -1:
+                    append_item = [" ".join(i.split()) for i in append_item.split("\n")]
+                else:
+                    append_item = " ".join(append_item.split())
+                appendix[list_naming[i]] = append_item
+            self.vacancies_objects.append(Vacancy(appendix))
+
+    def filter_vacancies(self, filter_key, filter_val):
+        filter_func = DIC_FILTER[filter_key]
+        self.vacancies_objects = list(filter(lambda v: get_filter(filter_func, filter_key, *filter_val)(v.to_dict()),
+                                             [vac for vac in self.vacancies_objects]))
+
+    def sort_vacancies(self, name, reverse=False):
+        self.vacancies_objects = sorted(self.vacancies_objects, key=dic_sorters[name], reverse=reverse)
+
+    def prettify_vacancies(self, filter_key, filter_val, sort_name, reverse=False):
+        self.filter_vacancies(filter_key, filter_val)
+        self.sort_vacancies(sort_name, reverse)
+
+    def print_vacancies(self, filter_key, filter_val, sort_name, dic_naming, reverse=False, row_indexes=[]):
+        self.prettify_vacancies(filter_key, filter_val, sort_name, reverse)
+        pretty_vacancies = [vacancy.to_pretty_dict() for vacancy in self.vacancies_objects]
+        if not row_indexes:
+            row_indexes = [1, len(pretty_vacancies) + 1]
+        if len(row_indexes) == 1:
+            row_indexes = [row_indexes[0], len(pretty_vacancies) + 1]
+        added, count = 0, 1
+        output = PrettyTable(hrules=1, start=row_indexes[0] - 1, end=row_indexes[1] - 1)
+        output.align = "l"
+        for vac in pretty_vacancies:
+            if not output.field_names:
+                output.field_names = [name for name in dic_trans.keys() if vac.get(name, None) or name == "№"]
+                dict_max = {}
+                for key in output.field_names:
+                    dict_max[dic_trans[key]] = 20
+                output._max_width = dict_max
+            vac["№"] = count
+            addable = []
+            for key in output.field_names:
+                addable.append(prettify_val(vac.get(key)))
+            count, added = count + 1, added + 1
+            output.add_row(addable)
+        output.field_names = [dic_trans[name] for name in output.field_names]
+        if added != 0 and added >= row_indexes[0]:
+            print(output.get_string(fields=list(dic_naming.values())))
+        else:
+            print("Ничего не найдено")
+
+
+class Salary:
+    def __init__(self, params):
+        self.salary_from = params["salary_from"]
+        self.salary_to = params["salary_to"]
+        self.salary_gross = params["salary_gross"]
+        self.salary_currency = params["salary_currency"]
+
+
+class Vacancy:
+    def __init__(self, params):
+        self.name = params["name"]
+        self.description = params["description"]
+        self.key_skills = params["key_skills"]
+        self.experience_id = params["experience_id"]
+        self.premium = params["premium"]
+        self.employer_name = params["employer_name"]
+        self.salary = Salary(params)
+        self.area_name = params["area_name"]
+        self.published_at = params["published_at"]
+
+    def to_dict(self):
+        return {"name": self.name, "description": self.description, "key_skills": self.key_skills,
+                "experience_id": self.experience_id, "premium": self.premium, "employer_name": self.employer_name,
+                "salary_from": self.salary.salary_from, "salary_to": self.salary.salary_to,
+                "salary_gross": self.salary.salary_gross, "salary_currency": self.salary.salary_currency,
+                "area_name": self.area_name, "published_at": self.published_at}
+
+    def to_pretty_dict(self):
+        return {"name": self.name,
+                "description": self.description,
+                "key_skills": self.key_skills,
+                "experience": DIC_PARAM[self.experience_id],
+                "premium": dic_joke[self.premium],
+                "employer_name": self.employer_name,
+                "salary": f"{parse_money(self.salary.salary_from)} - " + f"{parse_money(self.salary.salary_to)} " +
+                          f"({DIC_PARAM[self.salary.salary_currency]}) " + f"({DIC_PARAM[self.salary.salary_gross]})",
+                "area_name": self.area_name,
+                "published_at_date": ".".join(self.published_at.split("T")[0].split('-')[::-1])}
+
+
+class InputConnect:
+    is_ok: bool = True
+    message: str = None
+    sort_reverse: bool = False
+    sort_param: str
+    filter_key: str
+    filter_val: List[str]
+    dict_init: Dict[str, str]
+    filename: str
+    rows: List[int]
+
+    def __init__(self):
+        self.filename = input("Введите название файла: ")
+        filter_params = input("Введите параметр фильтрации: ")
+        if ':' not in filter_params and filter_params != "":
+            if self.message is None:
+                self.message = "Формат ввода некорректен"
+            self.is_ok = False
+        filter_params = filter_params.split(": ")
+        if filter_params[0] not in DIC_FILTER.keys() and filter_params != "":
+            if self.message is None:
+                self.message = "Параметр поиска некорректен"
+            self.is_ok = False
+        if filter_params != "":
+            self.filter_key, self.filter_val = filter_params[0], filter_params[1:]
+        self.sort_param = input("Введите параметр сортировки: ")
+        if not (self.sort_param in dic_terms.keys() or self.sort_param == ""):
+            self.is_ok = False
+            if self.message is None:
+                self.message = "Параметр сортировки некорректен"
+        sort_reverse_input = input("Обратный порядок сортировки (Да / Нет): ")
+        if not (sort_reverse_input in ["Да", "Нет", ""]):
+            self.is_ok = False
+            if self.message is None:
+                self.message = "Порядок сортировки задан некорректно"
+        if sort_reverse_input == "Да":
+            self.sort_reverse = True
+        else:
+            self.sort_reverse = False
+        self.rows = [int(i) for i in input("Введите диапазон вывода: ").split()]
+
+        self.dict_init = {"№": "№"}
+        fields = input("Введите требуемые столбцы: ").split(", ")
+        if fields and fields != ['']:
+            keys = [list(dic_trans.keys())[list(dic_trans.values()).index(i)] for i in fields]
+            vals = [dic_trans[key] for key in keys]
+            for i in range(len(keys)):
+                self.dict_init[keys[i]] = vals[i]
+        else:
+            self.dict_init = dic_trans
+
+if input("Введите данные для печати: ") == "":
+    input_connect: InputConnect = InputConnect()
+    # endregion
+    if input_connect.is_ok:
+        ds = DataSet(input_connect.filename)
+        ds.print_vacancies(input_connect.filter_key, input_connect.filter_val, input_connect.sort_param,
+                           input_connect.dict_init, input_connect.sort_reverse, input_connect.rows)
+    else:
+        print(input_connect.message)
+# vacancies.csv
+#
+# Опыт работ
+# Нет
+#
+# Компания, Название, Навыки, Опыт работы, Оклад
 
 # st = time.time()
-filename = input("Введите название файла: ")
-name = input("Введите название профессии: ")
+else:
+    filename = input("Введите название файла: ")
+    name = input("Введите название профессии: ")
 
-rep = Report(filename, name)
-rep.print_file()
-rep.generate_pdf()
+    rep = Report(filename, name)
+    rep.print_file()
+    rep.generate_pdf()
 # end = time.time()
 # print("All time:", end - st)
 # vacancies_by_year.csv
