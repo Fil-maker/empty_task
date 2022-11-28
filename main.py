@@ -292,8 +292,8 @@ def try_parse(val):
 def skills_filter(vac, *args):
     for skill in args[1].split(", "):
         if skill not in vac["key_skills"]:
-            return False
-    return True
+            return 0
+    return 1
 
 
 def salary_filter(vac, *args):
