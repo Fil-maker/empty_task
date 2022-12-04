@@ -24,22 +24,19 @@ SALARY_CURRENCY = 3
 AREA_NAME = 4
 PUBLISHED_AT = 5
 
-currency_to_rub = {
-    "AZN": 35.68,
-    "BYR": 23.91,
-    "EUR": 59.90,
-    "GEL": 21.74,
-    "KGS": 0.76,
-    "KZT": 0.13,
-    "RUR": 1,
-    "UAH": 1.64,
-    "USD": 60.66,
-    "UZS": 0.0055,
-}
-
 
 class Report:
+    """Класс для создания отчетов
+    Attributes:
+        Куча ненужных атрибутов
+    """
     def __init__(self, filename, name):
+        """Инициализирует класс для формирования отчетов
+        arguments:
+            filename (str): название профессии
+            name (str): название csv файла, по которому будет собрана информация
+        Куча параметров, которые описывать нет смысла. Тут 600 строк. Вы с ума сошли
+        """
         self.filename = filename
         self.name = name
         self.years = list(range(2007, 2023))
@@ -58,6 +55,7 @@ class Report:
         self.Wb = Workbook()
 
     def read_file(self):
+        """Считывает csv файл и записывает данные"""
         first = False
         with open(self.filename, encoding="utf-8") as file:
             reader = csv.reader(file)
@@ -90,6 +88,7 @@ class Report:
                         self.vacancies_length += 1
 
     def calculate_file(self):
+        """Ведет расчеты по информации в файле и сохраняет"""
         for i in self.years:
             if self.years_sums.get(i, None):
                 self.years_sums[i] = int(self.years_sums[i] // self.years_length[i])
@@ -108,6 +107,7 @@ class Report:
                                          reverse=True)[:10]}
 
     def print_file(self):
+        """Выводит отчет на экран"""
         print("Динамика уровня зарплат по годам:", self.years_sums)
         print("Динамика количества вакансий по годам:", self.years_length)
         if not len(self.years_sums_cur):
@@ -120,6 +120,7 @@ class Report:
         print("Доля вакансий по городам (в порядке убывания):", self.cities_partitions)
 
     def generate_excel(self):
+        """Генерирует отчет в формате excel файла"""
         self.years_stat_sheet = self.Wb.create_sheet(title="Статистика по годам")
         self.cities_stat_sheet = self.Wb.create_sheet(title="Статистика по городам")
         self.Wb.remove(self.Wb["Sheet"])
@@ -134,6 +135,7 @@ class Report:
         self.Wb.save('report.xlsx')
 
     def report_years(self):
+        """Генерирует информацию по годам для excel файла"""
         headers = ["Год", "Средняя зарплата", "Средняя зарплата - " + self.name,
                    "Количество вакансий", "Количество вакансий - " + self.name]
         self.set_headers(self.years_stat_sheet, headers)
@@ -148,6 +150,7 @@ class Report:
         self.fill_matrix(self.years_stat_sheet, matrix, offset=(0, 1))
 
     def fill_matrix(self, sheet, matrix, offset=(0, 0)):
+        """Заполняет данными страницу в excel"""
         for row in range(len(matrix)):
             for col in range(len(matrix[0])):
                 address = f"{get_column_letter(col + 1 + offset[0])}{row + 1 + offset[1]}"
@@ -157,6 +160,7 @@ class Report:
                 sheet.column_dimensions[get_column_letter(col + 1)].auto_size = 1
 
     def set_headers(self, sheet, headers, offset=(0, 0)):
+        """Записывает заголовки в excel файл"""
         for col in range(0, len(headers)):
             address = f"{get_column_letter(col + 1 + offset[0])}{1 + offset[1]}"
             sheet[address] = headers[col]
@@ -166,6 +170,7 @@ class Report:
             sheet.column_dimensions[get_column_letter(col + 1)].auto_size = 1
 
     def fit_cells(self):
+        """Подгоняет excel файл по ширине"""
         for sheet_name in self.Wb.sheetnames:
             sheet = self.Wb[sheet_name]
             for col in range(1, sheet.max_column + 1):
@@ -180,6 +185,7 @@ class Report:
                     sheet.column_dimensions[f"{get_column_letter(col)}"].width = + 2
 
     def report_cities(self):
+        """Заполняет excel файл статистикой по городам"""
         headers_payment = ["Город", "Уровень зарплат"]
         headers_percent = ["Город", "Доля вакансий"]
         self.set_headers(self.cities_stat_sheet, headers_payment)
@@ -194,6 +200,7 @@ class Report:
         self.fill_matrix(self.cities_stat_sheet, [[i] for i in list(matrix.values())], offset=(4, 1))
 
     def generate_image(self):
+        """Генерирует отчет в виде графика"""
         matplotlib.rc("font", size=8)
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(nrows=2, ncols=2)
         width = 0.3
@@ -234,6 +241,7 @@ class Report:
         plt.savefig("graph.png")
 
     def generate_pdf(self):
+        """Генерирует отчет в виде pdf файла"""
         self.generate_image()
         env = Environment(loader=FileSystemLoader('.'))
         template = env.get_template("pdf_template.html")
@@ -255,9 +263,11 @@ class Report:
         config = pdfkit.configuration(wkhtmltopdf=r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe')
         pdfkit.from_string(pdf_template, "report.pdf", configuration=config, options={"enable-local-file-access": ""})
 
+
 # region const
 
 def prettify_val(val):
+    """Делает данные красивыми для вывода в таблице"""
     if type(val) == list:
         val = "\n".join(val)
     val = str(val)
@@ -267,6 +277,7 @@ def prettify_val(val):
 
 
 def parse_money(amount):
+    """Приводит зарплаты к строкам в красивом формате"""
     nseq = []
     seq = list(reversed(list(str(amount))))
     for i in range(len(seq)):
@@ -277,6 +288,7 @@ def parse_money(amount):
 
 
 def try_parse(val):
+    """Обрабатывает информацию из файла"""
     if val == math.nan:
         return "nan"
     if val == "True":
@@ -290,6 +302,7 @@ def try_parse(val):
 
 
 def skills_filter(vac, *args):
+    """Фильтр для вывода по навыкам"""
     for skill in args[1].split(", "):
         if skill not in vac["key_skills"]:
             return False
@@ -297,27 +310,33 @@ def skills_filter(vac, *args):
 
 
 def salary_filter(vac, *args):
+    """Фильтр для вывода по зарплате"""
     return int(vac["salary_from"]) <= int(args[1]) <= int(vac["salary_to"])
 
 
 def publish_filter(vac, *args):
+    """Фильтр для вывода по дате публикации"""
     # return datetime.strptime(vac["published_at_date"], "%d.%m.%Y") == datetime.strptime(args[1], "%d.%m.%Y")
     return datetime.strptime(".".join(vac["published_at"].split("T")[0].split("-")[::-1]), "%d.%m.%Y") == datetime.strptime(args[1], "%d.%m.%Y")
 
 
 def parameter_filter(vac, *args):
+    """Фильтр для вывода по общим параметрам"""
     return DIC_PARAM[vac[dic_terms[args[0]]]] == args[1]
 
 
 def premium_filter(vac, *args):
+    """Фильтр для вывода по статусности вакансии"""
     return dic_joke[vac["premium"]] == args[1]
 
 
 def simple_parameter_filter(vac, *args):
+    """Фильтр для вывода по простым параметрам"""
     return vac[dic_terms[args[0]]] == args[1]
 
 
 def get_filter(func, *args):
+    """Метод для получения нужного фильтра"""
     def parameter_func(vac):
         return func(vac, *args)
 
@@ -432,12 +451,15 @@ dic_sorters = {
 # endregion
 
 class DataSet:
+    """Класс для хранения информации о вакансиях с кучей параметров и ненужных методов"""
     def __init__(self, file_name: str) -> None:
+        """Инициализирует DataSet через название файла"""
         self.file_name: str = file_name
         self.vacancies_objects: List[Vacancy] = []
         self.fill_vacancies()
 
     def read_file(self):
+        """Считывает файл с вакансиями"""
         keys = []
         values = []
         cnt = 1
@@ -461,6 +483,7 @@ class DataSet:
         return values, keys
 
     def fill_vacancies(self):
+        """Создает объекты класса Vacancy из данных из файла"""
         reader, list_naming = self.read_file()
         for vacancy in reader:
             appendix = {}
@@ -482,18 +505,24 @@ class DataSet:
             self.vacancies_objects.append(Vacancy(appendix))
 
     def filter_vacancies(self, filter_key, filter_val):
+        """Фильтрует вакансии по нужному параметру"""
         filter_func = DIC_FILTER[filter_key]
         self.vacancies_objects = list(filter(lambda v: get_filter(filter_func, filter_key, *filter_val)(v.to_dict()),
                                              [vac for vac in self.vacancies_objects]))
 
     def sort_vacancies(self, name, reverse=False):
+        """Сортирует вакансии по параметру"""
         self.vacancies_objects = sorted(self.vacancies_objects, key=dic_sorters[name], reverse=reverse)
 
     def prettify_vacancies(self, filter_key, filter_val, sort_name, reverse=False):
+        """Приводит DataSet к состоянию для вывода"""
         self.filter_vacancies(filter_key, filter_val)
         self.sort_vacancies(sort_name, reverse)
 
     def print_vacancies(self, filter_key, filter_val, sort_name, dic_naming, reverse=False, row_indexes=[]):
+        """Выводит вакансии
+        dic_naming (dict): словарь заголовков талблицы вывода
+        """
         self.prettify_vacancies(filter_key, filter_val, sort_name, reverse)
         pretty_vacancies = [vacancy.to_pretty_dict() for vacancy in self.vacancies_objects]
         if not row_indexes:
@@ -524,6 +553,7 @@ class DataSet:
 
 
 class Salary:
+    """Класс для зарплаты"""
     def __init__(self, params):
         self.salary_from = params["salary_from"]
         self.salary_to = params["salary_to"]
@@ -532,6 +562,7 @@ class Salary:
 
 
 class Vacancy:
+    """Класс для вакансии"""
     def __init__(self, params):
         self.name = params["name"]
         self.description = params["description"]
@@ -544,6 +575,7 @@ class Vacancy:
         self.published_at = params["published_at"]
 
     def to_dict(self):
+        """Возвращает вакансию в виде словаря"""
         return {"name": self.name, "description": self.description, "key_skills": self.key_skills,
                 "experience_id": self.experience_id, "premium": self.premium, "employer_name": self.employer_name,
                 "salary_from": self.salary.salary_from, "salary_to": self.salary.salary_to,
@@ -551,6 +583,7 @@ class Vacancy:
                 "area_name": self.area_name, "published_at": self.published_at}
 
     def to_pretty_dict(self):
+        """Возвращает вакансию в виде для вывода в таблице"""
         return {"name": self.name,
                 "description": self.description,
                 "key_skills": self.key_skills,
@@ -564,6 +597,7 @@ class Vacancy:
 
 
 class InputConnect:
+    """Класс для считывания ввода"""
     is_ok: bool = True
     message: str = None
     sort_reverse: bool = False
@@ -575,6 +609,7 @@ class InputConnect:
     rows: List[int]
 
     def __init__(self):
+        """Ввод и проверка правильности ввода"""
         self.filename = input("Введите название файла: ")
         filter_params = input("Введите параметр фильтрации: ")
         if ':' not in filter_params and filter_params != "":
