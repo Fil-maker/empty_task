@@ -78,7 +78,7 @@ class Report:
                         cur_city = row[AREA_NAME]
                         self.years_sums[cur_year] = self.years_sums.get(cur_year, 0) + cur_salary
                         self.years_length[cur_year] = self.years_length.get(cur_year, 0) + 1
-                        if name in cur_name:
+                        if self.name in cur_name:
                             self.years_sums_cur[cur_year] = self.years_sums_cur.get(cur_year, 0) + cur_salary
                             self.years_length_cur[cur_year] = self.years_length_cur.get(cur_year, 0) + 1
                         if cur_city not in self.cities:
@@ -649,31 +649,31 @@ class InputConnect:
         else:
             self.dict_init = dic_trans
 
-if input("Введите данные для печати: ") == "":
-    input_connect: InputConnect = InputConnect()
-    # endregion
-    if input_connect.is_ok:
-        ds = DataSet(input_connect.filename)
-        ds.print_vacancies(input_connect.filter_key, input_connect.filter_val, input_connect.sort_param,
-                           input_connect.dict_init, input_connect.sort_reverse, input_connect.rows)
-    else:
-        print(input_connect.message)
+if __name__ == '__main__':
+    if input("Введите данные для печати: ") == "":
+        input_connect: InputConnect = InputConnect()
+        if input_connect.is_ok:
+            ds = DataSet(input_connect.filename)
+            ds.print_vacancies(input_connect.filter_key, input_connect.filter_val, input_connect.sort_param,
+                               input_connect.dict_init, input_connect.sort_reverse, input_connect.rows)
+        else:
+            print(input_connect.message)
+#
 # vacancies.csv
 #
-# Опыт работ
-# Нет
 #
-# Компания, Название, Навыки, Опыт работы, Оклад
+#
+# 1 3
 
-# st = time.time()
-else:
-    filename = input("Введите название файла: ")
-    name = input("Введите название профессии: ")
+    # st = time.time()
+    else:
+        filename = input("Введите название файла: ")
+        name = input("Введите название профессии: ")
 
-    rep = Report(filename, name)
-    rep.print_file()
-    rep.generate_pdf()
-# end = time.time()
-# print("All time:", end - st)
+        rep = Report(filename, name)
+        rep.print_file()
+        # rep.generate_pdf()
+    # end = time.time()
+    # print("All time:", end - st)
 # vacancies_by_year.csv
 # Программист
