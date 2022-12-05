@@ -13,6 +13,7 @@ import math
 from datetime import datetime
 from prettytable import PrettyTable
 from typing import *
+import cProfile
 
 
 # import time
@@ -318,6 +319,7 @@ def publish_filter(vac, *args):
     """Фильтр для вывода по дате публикации"""
     # return datetime.strptime(vac["published_at_date"], "%d.%m.%Y") == datetime.strptime(args[1], "%d.%m.%Y")
     return datetime.strptime(".".join(vac["published_at"].split("T")[0].split("-")[::-1]), "%d.%m.%Y") == datetime.strptime(args[1], "%d.%m.%Y")
+    # return ".".join(vac["published_at"].split("T")[0].split("-")[::-1]) == args[1]
 
 
 def parameter_filter(vac, *args):
@@ -444,7 +446,8 @@ dic_sorters = {
     "Оклад": lambda v: (int(v.salary.salary_from) + int(v.salary.salary_to)) / 2 * currency_to_rub[
         v.salary.salary_currency],
     "Навыки": lambda v: len(v.key_skills) if type(v.key_skills) == list else 1,
-    "Дата публикации вакансии": lambda v: [datetime.strptime(v.published_at, "%Y-%m-%dT%H:%M:%S%z")]
+    # "Дата публикации вакансии": lambda v: v.published_at
+    "Дата публикации вакансии": lambda v: datetime.strptime(v.published_at, "%Y-%m-%dT%H:%M:%S%z")
 }
 
 
@@ -654,16 +657,15 @@ if __name__ == '__main__':
         input_connect: InputConnect = InputConnect()
         if input_connect.is_ok:
             ds = DataSet(input_connect.filename)
-            ds.print_vacancies(input_connect.filter_key, input_connect.filter_val, input_connect.sort_param,
-                               input_connect.dict_init, input_connect.sort_reverse, input_connect.rows)
+            cProfile.run('ds.print_vacancies(input_connect.filter_key, input_connect.filter_val, input_connect.sort_param, input_connect.dict_init, input_connect.sort_reverse, input_connect.rows)')
         else:
             print(input_connect.message)
 #
-# vacancies.csv
-#
-#
-#
-# 1 3
+# vacancies_medium.csv
+# Дата публикации вакансии: 15.06.2022
+# Дата публикации вакансии
+# Да
+# 3 10
 
     # st = time.time()
     else:
