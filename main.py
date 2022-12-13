@@ -1,5 +1,6 @@
 import csv
 import os
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from multiprocessing import Process, Queue
 import cProfile
 from os import listdir
@@ -25,7 +26,7 @@ def num(n):
 
 # region fast
 
-def calculate_mini(filename, speciality, year, q):
+def calculate_mini(filename, speciality, year):
     first = False
     am = 0
     avg_s = 0
@@ -49,7 +50,7 @@ def calculate_mini(filename, speciality, year, q):
                     alt_am += 1
                     alt_avg_s += (num(row[SALARY_FROM]) + num(row[SALARY_TO])) / 2 * currency_to_rub[
                         row[SALARY_CURRENCY]]
-    q.put((year, am, int(avg_s // am), alt_am, int(alt_avg_s // alt_am)))
+    return ((year, am, int(avg_s // am), alt_am, int(alt_avg_s // alt_am)))
 
 
 def split_file(filename):
@@ -80,15 +81,20 @@ def split_file(filename):
 
 def calc_multi(years, mypath, spec):
     onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
-    procs = {}
+    procs = []
     q = Queue()
     sums, vacs, spec_sums, spec_vacs = {}, {}, {}, {}
-    for year in years:
-        proc = Process(target=calculate_mini, args=(f"splits\\split_{year}.csv", spec, year, q))
-        procs[year] = proc
-        proc.start()
+    with ProcessPoolExecutor(max_workers=16) as executor:
+        for year in years:
+            ex = executor.submit(calculate_mini, f"splits\\split_{year}.csv", spec, year)
+            procs.append(ex)
+        # for year in years:
+        #     proc = Process(target=calculate_mini, args=(f"splits\\split_{year}.csv", spec, year, q))
+        #     procs[year] = proc
+        #     proc.start()
     for i in range(len(years)):
-        data = q.get()
+        data = procs[i].result()
+        # data = q.get()
         sums[data[0]] = data[1]
         vacs[data[0]] = data[2]
         spec_sums[data[0]] = data[3]
