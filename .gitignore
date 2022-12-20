@@ -1,6 +1,7 @@
 venv/
 .idea/
-vacancies.csv
-vacancies_by_year.csv
-vacancies_medium.csv
+vacancies/vacancies.csv
+vacancies/vacancies_by_year.csv
+vacancies/vacancies_medium.csv
 splits
+/vacancies
