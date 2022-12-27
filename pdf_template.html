@@ -28,7 +28,7 @@
     </style>
 </head>
 <body>
-<h1 style="text-align: center">Аналитика по зарплатам для профессии {{ name }}</h1>
+<h1 style="text-align: center">Аналитика по зарплатам и городам для профессии {{ name }} и города {{area_name}}</h1>
 <main style="text-align: center">
     <div style="display: flex; justify-content: center">
         <img src="{{ plot }}">
@@ -38,9 +38,9 @@
         <tr>
             <th>Год</th>
             <th>Средняя зарплата</th>
-            <th>Средняя зарплата - {{name}}</th>
+            <th>Средняя зарплата - {{name}} в городе {{area_name}}</th>
             <th>Количество вакансий</th>
-            <th>Количество вакансий - {{name}}</th>
+            <th>Количество вакансий - {{name}} в городе {{area_name}}</th>
         </tr>
         {% for key, val in years_stat.items() %}
         <tr>
@@ -51,6 +51,37 @@
         </tr>
         {% endfor %}
     </table>
+    <h2>Статистика по городам</h2>
+    <div class="container">
+        <div class="left">
+            <table class="half-table">
+                <tr>
+                    <th>Год</th>
+                    <th>Уровень зарплат</th>
+                </tr>
+                {% for key, val in cities_sum.items() %}
+                <tr>
+                    <td>{{ key }}</td>
+                    <td>{{ val }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <div class="right">
+            <table class="half-table">
+                <tr>
+                    <th>Город</th>
+                    <th>Доля вакансий</th>
+                </tr>
+                {% for key, val in cities_part.items() %}
+                <tr>
+                    <td>{{ key }}</td>
+                    <td>{{ val }}%</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
 </main>
 </body>
 </html>
