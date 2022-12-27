@@ -4,8 +4,6 @@ from concurrent.futures import ProcessPoolExecutor
 from datetime import timedelta, datetime
 from math import isnan
 from multiprocessing import Process, Queue
-from os import listdir
-from os.path import isfile, join
 from xml.etree import ElementTree as et
 
 import pandas
@@ -17,11 +15,13 @@ from matplotlib import pyplot as plt
 import matplotlib
 import numpy as np
 from storage import calc_full
+import sqlite3
 
 
 # region report
 
-def generate_image(name, area_name, period, years_sums, years_sums_cur, years_vacs, years_vacs_cur, ans_cities_sums, cities_partitions):
+def generate_image(name, area_name, period, years_sums, years_sums_cur, years_vacs, years_vacs_cur, ans_cities_sums,
+                   cities_partitions):
     matplotlib.rc("font", size=8)
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(nrows=2, ncols=2)
     width = 0.3
@@ -61,14 +61,16 @@ def generate_image(name, area_name, period, years_sums, years_sums_cur, years_va
     plt.savefig("graph.png")
 
 
-def create_pdf(name, area_name, period, years_sums, years_sums_cur, years_length, years_length_cur, ans_cities_sums, cities_partitions):
-    generate_image(name, area_name, period, years_sums, years_sums_cur, years_length, years_length_cur, ans_cities_sums, cities_partitions)
+def create_pdf(name, area_name, period, years_sums, years_sums_cur, years_length, years_length_cur, ans_cities_sums,
+               cities_partitions):
+    generate_image(name, area_name, period, years_sums, years_sums_cur, years_length, years_length_cur, ans_cities_sums,
+                   cities_partitions)
     env = Environment(loader=FileSystemLoader('.'))
     template = env.get_template("pdf_template.html")
     pt = os.path.abspath("graph.png")
 
     years_stat = {}
-    for k in years:
+    for k in period:
         if years_sums.get(k, None) is not None:
             years_stat[k] = [years_sums[k], years_sums_cur[k], years_length[k],
                              years_length_cur[k]]
@@ -227,7 +229,7 @@ def calc_multi(name, area_name, period):
     sums, vacs, spec_sums, spec_vacs = {}, {}, {}, {}
     with ProcessPoolExecutor(max_workers=32) as executor:
         for year in period:
-            proc = Process(target=calculate_mini, args=(f"splits\\split_{year}.csv", name,area_name, q))
+            proc = Process(target=calculate_mini, args=(f"splits\\split_{year}.csv", name, area_name, q))
             procs[year] = proc
             proc.start()
     for year in period:
@@ -238,9 +240,10 @@ def calc_multi(name, area_name, period):
         spec_vacs[year] = data[1]
     create_pdf(name, area_name, period, sums, spec_sums, vacs, spec_vacs)
 
+
 # endregion
 
-
+# region single
 def soft_equal(df, key, value):
     return df[df[key].str.contains(value)]
 
@@ -252,7 +255,6 @@ def test(ser):
     print("Inside test:", ser)
 
 
-# region single
 def full_file_stat(file, name, area_name, period):
     avg_salary_total_year = {}
     avg_salary_cur_year = {}
@@ -265,14 +267,15 @@ def full_file_stat(file, name, area_name, period):
     print("Общее количество вакансий в файле", len(frame))
     good_frame = (frame
                   .query("salary_to > 0 or salary_from > 0")
-                  .assign(salary=lambda fr: fr.apply(lambda x: func((x.salary_from, x.salary_to, x.salary_currency, x.published_at)),
-                                  axis=1))
+                  .assign(
+        salary=lambda fr: fr.apply(lambda x: func((x.salary_from, x.salary_to, x.salary_currency, x.published_at)),
+                                   axis=1))
                   .assign(published_at=lambda fr: fr["published_at"].apply(lambda x: int(x[:4])))
                   .drop(['salary_from', 'salary_to', 'salary_currency'], axis=1))
     print("Количество 'хороших вакансий'", len(good_frame))
 
     cities = good_frame.groupby(by="area_name")
-    cities.filter(lambda x: x["salary"].count()/len(cities) > 0.01)
+    cities.filter(lambda x: x["salary"].count() / len(cities) > 0.01)
 
     cities_salaries = cities.mean(numeric_only=True).sort_values("salary", ascending=False)
     cities_salaries["salary"] = cities_salaries["salary"].apply(lambda sal: round(sal, 2))
@@ -283,7 +286,7 @@ def full_file_stat(file, name, area_name, period):
     cities_percent = (cities_percent
                       .assign(count=lambda fr: fr["name"])
                       .drop(["name", "published_at", "salary"], axis=1)
-                      .assign(percent=lambda fr: round(fr["count"]/fr["count"].sum(), 4))
+                      .assign(percent=lambda fr: round(fr["count"] / fr["count"].sum(), 4))
                       .sort_values("percent", ascending=False))
     partition_vacancy_cities = cities_percent.loc[:, ["percent"]].iloc[:10, :].to_dict()["percent"]
     print(cities_percent.loc[:, ["percent"]].iloc[:10, :])
@@ -300,7 +303,8 @@ def full_file_stat(file, name, area_name, period):
                           .soft_equal("name", name))
     name_area_specific_year_grouped = name_area_specific.groupby("published_at")
 
-    name_area_specific_salary_level = name_area_specific_year_grouped.mean(numeric_only=True).sort_values("published_at")
+    name_area_specific_salary_level = name_area_specific_year_grouped.mean(numeric_only=True).sort_values(
+        "published_at")
     avg_salary_cur_year = name_area_specific_salary_level["salary"].apply(lambda x: round(x, 2)).to_dict()
     print(name_area_specific_salary_level)
 
@@ -319,12 +323,32 @@ def full_file_stat(file, name, area_name, period):
 
 
 if __name__ == '__main__':
-    filename, name, area_name = 'vacancies/vacancies_dif_currencies.csv', "разработчик", "Санкт-Петербург"
+    # filename, name, area_name = 'vacancies/vacancies_dif_currencies.csv', "разработчик", "Санкт-Петербург"
 
     # years = split_file(filename)
-    years = list(range(2003, 2023))
+    # years = list(range(2003, 2023))
     # calc_multi(name, area_name, years)
-    full_file_stat(filename, name, area_name, years)
-
-# There are 4074961 vacancies in vacancies/vacancies_dif_currencies.csv
-# Only 2146294 of which are valid
+    # full_file_stat(filename, name, area_name, years)
+    val = set()
+    currencies = []
+    app = []
+    for year in range(2003, 2023):
+        for month in range(1, 13):
+            if month < 10:
+                date = f"0{month}"
+            else:
+                date = f"{month}"
+            res = create_dic_cur(f"{year}-{date}")
+            [val.add(item) for item in res]
+            currencies.append([f"{year}-{date}", res])
+    val = list(val)
+    for c in currencies:
+        aps = [c[0]]
+        for n in val:
+            aps.append(c[1].get(n, None))
+        app.append(aps)
+    frame = pd.DataFrame(app, index=None, columns=["date"] + val)
+    frame.set_index("date", inplace=True)
+    frame.to_csv("result.csv")
+    con = sqlite3.connect("currencies.db")
+    frame.to_sql("currencies", con)
